@@ -66,16 +66,19 @@
       min-height: calc(var(--cell) * .9);
       text-shadow: 0 0 2px #f00, 0 0 6px #800; /* glowy LED */
     }
-    .face{
-      width: var(--face-size); height: var(--face-size);
-      display:grid; place-items:center; 
-      font-size: calc(var(--face-size) * .55);
-      cursor:pointer;
-      border: 4px solid var(--border-light);
-      border-right-color: var(--border-dark);
-      border-bottom-color: var(--border-dark);
-      background: #e0e0e0;
-    }
+.face {
+  width: var(--face-size);
+  height: var(--face-size);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size: calc(var(--face-size) * .55);
+  cursor:pointer;
+  border: 4px solid var(--border-light);
+  border-right-color: var(--border-dark);
+  border-bottom-color: var(--border-dark);
+  background: #e0e0e0;
+}
     .face:active{ filter: brightness(.95); }
 
     .controls{ display:flex; gap:8px; align-items:center; justify-content:flex-start; }
@@ -162,7 +165,7 @@
       <div class="topbar">
         <div id="mineCount" class="led" aria-live="polite">000</div>
         <button id="reset" class="face" aria-label="New game">🙂</button>
-        <div id="timer" class="led">000</div>
+        <div id="timer" class="led">00:00</div>
       </div>
       <div class="controls" aria-label="Game controls">
         <label>
@@ -215,12 +218,34 @@
     function pad3(n){ n = Math.max(0, Math.min(999, n|0)); return String(n).padStart(3,'0'); }
 
     function stopTimer(){ if(timer.id){ clearInterval(timer.id); } timer.id=null; timer.running=false; }
-    function resetTimer(){ stopTimer(); timerEl.textContent = '000'; timer.start=null; }
-    function startTimer(){ if(timer.running) return; timer.running=true; timer.start = Date.now(); timer.id = setInterval(()=>{
-      const s = Math.floor((Date.now()-timer.start)/1000);
-      timerEl.textContent = pad3(s);
-    }, 333); }
+    function resetTimer(){ stopTimer(); timerEl.textContent = '00:00'; timer.start=null; }
+function startTimer() {
+  if (timer.running) return;
 
+  timer.running = true;
+  timer.start = Date.now();
+
+  timer.id = setInterval(() => {
+    const diff = Math.floor((Date.now() - timer.start) / 1000);
+
+    const hours = Math.floor(diff / 3600);
+    const minutes = Math.floor((diff % 3600) / 60);
+    const seconds = diff % 60;
+
+    let text;
+    if (hours > 0) {
+      text = `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
+    } else {
+      text = `${pad2(minutes)}:${pad2(seconds)}`;
+    }
+
+    timerEl.textContent = text;
+  }, 333);
+}
+
+function pad2(num) {
+  return num.toString().padStart(2, "0");
+}
     function setFace(kind){
       const faces = {idle:'🙂', wow:'😮', dead:'😵', cool:'😎'};
       faceBtn.textContent = faces[kind] || faces.idle;
@@ -433,16 +458,20 @@
       customInputs.style.display = diffSel.value==='custom' ? 'inline-flex' : 'none';
     });
 
-    document.addEventListener('keydown', (e)=>{
-      if(e.key==='r' || e.key==='R'){ newGameFromControls(); }
-      if(e.key==='f' || e.key==='F'){
-        // Flag the cell currently under pointer (best effort)
-        const el = document.elementFromPoint(lastMouse.x, lastMouse.y);
-        if(el && el.classList.contains('cell')){
-          const r = +el.dataset.r, c = +el.dataset.c; toggleFlag(r,c);
-        }
-      }
-    });
+  document.addEventListener('keydown', (e)=>{
+  if(e.key === 'r' || e.key === 'R'){
+    e.preventDefault(); // блокируем браузерное действие
+    newGameFromControls();
+  }
+  if(e.key === 'f' || e.key === 'F'){
+    e.preventDefault(); // блокируем поиск по странице
+    const el = document.elementFromPoint(lastMouse.x, lastMouse.y);
+    if(el && el.classList.contains('cell')){
+      const r = +el.dataset.r, c = +el.dataset.c;
+      toggleFlag(r, c);
+    }
+  }
+});
 
     let lastMouse={x:0,y:0};
     document.addEventListener('mousemove', (e)=>{ lastMouse.x=e.clientX; lastMouse.y=e.clientY; });
