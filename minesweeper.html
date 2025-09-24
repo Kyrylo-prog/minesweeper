@@ -26,13 +26,26 @@
     }
     *{box-sizing:border-box}
     html,body{height:100%}
-    body{
-      margin:0;
-      font-family: system-ui, -apple-system, Segoe UI, Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(180deg,#e6e6e6,#d8d8d8 20%, #cfcfcf 60%, #e6e6e6);
-      display:flex; align-items:center; justify-content:center; padding:14px;
-      user-select:none;
-    }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Tahoma, Geneva, Verdana, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  user-select: none;
+
+  /* фон по умолчанию для ноутов и мобильных */
+  background: linear-gradient(180deg,#e6e6e6,#d8d8d8 20%, #cfcfcf 60%, #e6e6e6);
+}
+
+/* Только если экран хотя бы 1920x1080 */
+@media (min-height: 860px) and (min-width: 1700px) {
+  body {
+  background: url("wallpaper_XP.png") no-repeat center center;
+  background-size: 100vw 100vh; 
+  }
+}
     .game{
       background: var(--bg);
       padding:10px;
@@ -88,6 +101,7 @@
       border: 3px solid var(--border-light);
       border-right-color: var(--border-dark);
       border-bottom-color: var(--border-dark);
+      padding-bottom: 8px;
     }
     .select{ appearance:none; }
     .button:active{ translate:0 1px; }
