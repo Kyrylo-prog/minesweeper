@@ -479,14 +479,14 @@ function pad2(num) {
     if(isTyping(e.target)) return;
 
     const k = (e.key || '').toLowerCase();
-    if(k === 'r' || k=== "K"){
+    if(k === 'r' || k=== "R"){
       e.preventDefault();
       newGameFromControls();
       return;
     }
 
     // Flag: f или F (основной)
-    if(k === F || k === 'f'){
+    if(k === "F" || k === 'f'){
       e.preventDefault();
       const el = document.elementFromPoint(lastMouse.x, lastMouse.y);
       if(el && el.classList && el.classList.contains('cell')){
