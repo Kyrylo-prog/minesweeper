@@ -39,7 +39,7 @@ body {
   background: linear-gradient(180deg,#e6e6e6,#d8d8d8 20%, #cfcfcf 60%, #e6e6e6);
 }
 
-/* Только если экран хотя бы 1920x1080 */
+/* Только если экран хотя бы ... */
 @media (min-height: 860px) and (min-width: 1700px) {
   body {
   background: url("wallpaper_XP.png") no-repeat center center;
@@ -472,20 +472,34 @@ function pad2(num) {
       customInputs.style.display = diffSel.value==='custom' ? 'inline-flex' : 'none';
     });
 
-  document.addEventListener('keydown', (e)=>{
-  if(e.key === 'r' || e.key === 'R'){
-    e.preventDefault(); // блокируем браузерное действие
-    newGameFromControls();
-  }
-  if(e.key === 'f' || e.key === 'F'){
-    e.preventDefault(); // блокируем поиск по странице
-    const el = document.elementFromPoint(lastMouse.x, lastMouse.y);
-    if(el && el.classList.contains('cell')){
-      const r = +el.dataset.r, c = +el.dataset.c;
-      toggleFlag(r, c);
+    (function(){
+  const isTyping = (t)=> t && (t.tagName==='INPUT' || t.tagName==='TEXTAREA' || t.tagName==='SELECT' || t.isContentEditable);
+  window.addEventListener('keydown', function(e){
+    // если печатают в input/select, не мешаем
+    if(isTyping(e.target)) return;
+
+    const k = (e.key || '').toLowerCase();
+    if(k === 'r' || k=== "K"){
+      e.preventDefault();
+      newGameFromControls();
+      return;
     }
-  }
-});
+
+    // Flag: f или F (основной)
+    if(k === F || k === 'f'){
+      e.preventDefault();
+      const el = document.elementFromPoint(lastMouse.x, lastMouse.y);
+      if(el && el.classList && el.classList.contains('cell')){
+        toggleFlag(+el.dataset.r, +el.dataset.c);
+      }
+      return;
+    }
+
+
+  }, true); // capture: true
+})();
+
+
 
     let lastMouse={x:0,y:0};
     document.addEventListener('mousemove', (e)=>{ lastMouse.x=e.clientX; lastMouse.y=e.clientY; });
