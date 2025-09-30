@@ -7,7 +7,7 @@
   <style>
     :root{
       /* Responsive cell size: scales down on small screens */
-      --cell: min(42px, max(24px, 5.2vw));
+      --cell: 24px;
       --bg: #c0c0c0;             /* classic Win gray */
       --face-size: calc(var(--cell) * 1.2);
       --border-light: #fff;
@@ -24,6 +24,23 @@
       --shadow: rgba(0,0,0,.2);
       --outline: #000;           /* grid outline */
     }
+    @media (max-width: 1200px) {
+  :root {
+    --cell: 20px;
+  }
+}
+
+@media (max-width: 900px) {
+  :root {
+    --cell: 16px;
+  }
+}
+
+@media (max-width: 600px) {
+  :root {
+    --cell: 12px; /* для телефонов */
+  }
+}
     *{box-sizing:border-box}
     html,body{height:100%}
 body {
@@ -38,12 +55,17 @@ body {
   /* фон по умолчанию для ноутов и мобильных */
   background: linear-gradient(180deg,#e6e6e6,#d8d8d8 20%, #cfcfcf 60%, #e6e6e6);
 }
-
+.footer {
+  display: none; /* по умолчанию скрыт */
+}
 /* Только если экран хотя бы ... */
 @media (min-height: 860px) and (min-width: 1700px) {
   body {
   background: url("wallpaper_XP.png") no-repeat center center;
   background-size: 100vw 100vh; 
+  }
+    .footer {
+    display: block;
   }
 }
     .game{
@@ -188,7 +210,10 @@ body {
             <option value="beginner">Beginner (9×9, 10)</option>
             <option value="intermediate">Intermediate (16×16, 40)</option>
             <option value="expert">Expert (16×30, 99)</option>
+            <option value="donut">Donut (17×17, 40)</option>
+            <option value="diamond">Diamond (40 bombs)</option>
             <option value="custom">Custom…</option>
+
           </select>
         </label>
         <label id="customInputs" style="display:none; gap:6px; align-items:center;">
@@ -224,6 +249,8 @@ body {
       beginner: {rows:9, cols:9, mines:10},
       intermediate: {rows:16, cols:16, mines:40},
       expert: {rows:16, cols:30, mines:99},
+      diamond: {rows:17, cols:17, mines:40, shape:"diamond"},
+      donut: {rows:17, cols:17, mines:40, shape:"donut"},
     };
 
     let state = {};
@@ -265,17 +292,20 @@ function pad2(num) {
       faceBtn.textContent = faces[kind] || faces.idle;
     }
 
-    function neighbors(r,c){
-      const list=[];
-      for(let dr=-1; dr<=1; dr++){
-        for(let dc=-1; dc<=1; dc++){
-          if(dr===0 && dc===0) continue;
-          const nr=r+dr, nc=c+dc;
-          if(nr>=0 && nr<state.rows && nc>=0 && nc<state.cols){ list.push([nr,nc]); }
-        }
+function neighbors(r,c){
+  const list=[];
+  for(let dr=-1; dr<=1; dr++){
+    for(let dc=-1; dc<=1; dc++){
+      if(dr===0 && dc===0) continue;
+      const nr=r+dr, nc=c+dc;
+      if(nr>=0 && nr<state.rows && nc>=0 && nc<state.cols){
+        list.push([nr,nc]);
       }
-      return list;
     }
+  }
+  return list;
+}
+
 
     function index(r,c){ return r*state.cols + c; }
 
@@ -286,11 +316,14 @@ function pad2(num) {
       const banned = new Set([index(firstR,firstC), ...neighbors(firstR,firstC).map(([r,c])=>index(r,c))]);
       cells = cells.filter(i=>!banned.has(i));
       shuffle(cells);
-      for(let m=0; m<state.mines; m++){
-        const id = cells[m];
-        const r = Math.floor(id / state.cols), c = id % state.cols;
-        state.grid[r][c].mine = true;
-      }
+let placed = 0;
+for (let i = 0; i < cells.length && placed < state.mines; i++) {
+  const id = cells[i];
+  const r = Math.floor(id / state.cols), c = id % state.cols;
+  if (state.grid[r][c].disabled) continue; // не ставим на пустые diamond-клетки
+  state.grid[r][c].mine = true;
+  placed++;
+}
       // compute counts
       for(let r=0;r<state.rows;r++){
         for(let c=0;c<state.cols;c++){
@@ -314,9 +347,41 @@ function pad2(num) {
         r,c, mine:false, count:0, flagged:false, revealed:false, el:null
       })));
 
+      //diamond shape
+const shape = DIFFS[diffSel.value]?.shape;
+if (shape === "diamond") {
+  const mid = Math.floor(rows/2);
+  for (let r=0; r<rows; r++) {
+    for (let c=0; c<cols; c++) {
+      const dist = Math.abs(r-mid) + Math.abs(c-mid);
+      if (dist > mid) {
+        state.grid[r][c].disabled = true;
+      }
+    }
+  }
+}
+//donut shape
+if (shape === "donut") {
+  const holeSize = 5; // ширина/высота дыры
+  const start = Math.floor((rows - holeSize) / 2);
+  const end = start + holeSize - 1;
+  for (let r= start; r<=end; r++) {
+    for (let c= start; c<=end; c++) {
+      state.grid[r][c].disabled = true;
+    }
+  }
+}
+
       const frag = document.createDocumentFragment();
       for(let r=0;r<rows;r++){
         for(let c=0;c<cols;c++){
+              if (state.grid[r][c].disabled) {
+      const cellEl = document.createElement('div');
+      cellEl.style.width = "var(--cell)";
+      cellEl.style.height = "var(--cell)";
+      frag.appendChild(cellEl);
+      continue;
+    }
           const cellEl = document.createElement('button');
           cellEl.className='cell';
           cellEl.setAttribute('role','gridcell');
@@ -411,12 +476,12 @@ function pad2(num) {
       for(let r=0;r<state.rows;r++){
         for(let c=0;c<state.cols;c++){
           const cell = state.grid[r][c];
-          if(cell.mine){
-            cell.el.classList.add('revealed','mine');
-          }else if(cell.flagged){
-            // wrong flag
-            cell.el.classList.add('revealed','wrong');
-          }
+if (cell.disabled) continue; // пропускаем diamond-пустышки
+if(cell.mine){
+  cell.el.classList.add('revealed','mine');
+}else if(cell.flagged){
+  cell.el.classList.add('revealed','wrong');
+}
         }
       }
       state.grid[triggerR][triggerC].el.style.background = '#f7bbbb';
