@@ -41,6 +41,8 @@
     --cell: 12px; /* для телефонов */
   }
 }
+
+
     *{box-sizing:border-box}
     html,body{height:100%}
 body {
@@ -202,6 +204,9 @@ body {
 <div id="sectionCounter" class="section-counter" style="display:none; position:sticky; top:0; background:#222; color:#0f0; text-align:center; padding:4px; font-weight:bold;">
   Sections passed: <span id="sectionsValue">0</span>
 </div>
+<div id="stickyTimer" class="sticky-timer" style="display:none; position:sticky; top:0; background:#111; color:#0ff; text-align:center; padding:4px; font-weight:bold;">
+  Time: <span id="stickyTimerValue">00:00</span>
+</div>
   <div class="game" role="application" aria-label="Minesweeper">
     <div class="frame">
       <div class="topbar">
@@ -289,6 +294,9 @@ function startTimer() {
     }
 
     timerEl.textContent = text;
+    if (state.infinite) {
+  document.getElementById("stickyTimerValue").textContent = text;
+}
   }, 333);
 }
 
@@ -393,8 +401,9 @@ function extendBoard() {
   }
 
 state.section++;
-const counter = document.getElementById('sectionsValue');
-if (counter) counter.textContent = state.section;
+if (state.infinite) {
+document.getElementById('sectionsValue').textContent = state.section;
+}
 }
 
     function init(rows, cols, mines){
@@ -405,6 +414,14 @@ if (counter) counter.textContent = state.section;
   state.chunkSize = 20;
   state.minesPerChunk = Math.round(mines / (cols / state.chunkSize));
   state.infinite = !!DIFFS[diffSel.value]?.infinite;
+  const stickyBar = document.getElementById('stickyBar');
+if (state.infinite) {
+  document.getElementById('sectionCounter').style.display = 'block';
+  document.getElementById('stickyTimer').style.display = 'block';
+} else {
+  document.getElementById('sectionCounter').style.display = 'none';
+  document.getElementById('stickyTimer').style.display = 'none';
+}
 const sectionCounter = document.getElementById('sectionCounter');
 if (state.infinite) {
   sectionCounter.style.display = 'block';
@@ -698,6 +715,20 @@ if(cell.mine){
     diffSel.value = 'beginner';
     newGameFromControls();
   })();
+
+  function updateTimer() {
+  if (!state.startTime || !state.alive) return;
+  const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
+  const mins = Math.floor(elapsed / 60).toString().padStart(2, '0');
+  const secs = (elapsed % 60).toString().padStart(2, '0');
+  document.getElementById('timer').textContent = `${mins}:${secs}`;
+
+  // 🔁 обновляем sticky-таймер только если включён бесконечный режим
+  if (state.infinite) {
+    const stickyTimer = document.getElementById('stickyTimer');
+    if (stickyTimer) stickyTimer.textContent = `${mins}:${secs}`;
+  }
+}
   </script>
 </body>
 </html>
