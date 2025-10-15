@@ -129,6 +129,7 @@ body {
     .button:active{ translate:0 1px; }
 
     .board-wrap{
+      scroll-behavior: smooth;
       background: var(--panel);
       border: 4px solid var(--border-light);
       border-right-color: var(--border-dark);
@@ -198,6 +199,9 @@ body {
   </style>
 </head>
 <body>
+<div id="sectionCounter" class="section-counter" style="display:none; position:sticky; top:0; background:#222; color:#0f0; text-align:center; padding:4px; font-weight:bold;">
+  Sections passed: <span id="sectionsValue">0</span>
+</div>
   <div class="game" role="application" aria-label="Minesweeper">
     <div class="frame">
       <div class="topbar">
@@ -211,15 +215,11 @@ body {
           <select id="difficulty" class="select" title="Select difficulty">
             <option value="beginner">Beginner (9×9, 10)</option>
             <option value="intermediate">Intermediate (16×16, 40)</option>
-<<<<<<< HEAD
             <option value="expert">Expert (16×30, 99)</option>
-=======
-            <option value="expert">Expert (16×23, 99)</option>
->>>>>>> 44a6ad5 (Обновил HTML/CSS/JS)
             <option value="donut">Donut (17×17, 40)</option>
             <option value="diamond">Diamond (40 bombs)</option>
             <option value="custom">Custom…</option>
-
+            <option value="infinite" style="color: red;">Infinite mode &#9854;</option>
           </select>
         </label>
         
@@ -230,9 +230,9 @@ body {
         </label>
         <button id="newGame" class="button">New Game</button>
       </div>
-      <div class="board-wrap" style="margin-top:8px;">
-        <div id="board" class="board" role="grid" aria-label="Minesweeper grid"></div>
-      </div>
+<div class="board-wrap" style="margin-top:8px; overflow-x:auto; overflow-y:hidden;">
+  <div id="board" class="board" role="grid" aria-label="Minesweeper grid"></div>
+</div>
       <div id="status" class="status" aria-live="polite"></div>
       <div class="footer">Left-click to reveal • Right-click or <span class="kbd">F</span> to flag • Double-click a number to chord • Press <span class="kbd">R</span> to restart</div>
     </div>
@@ -253,6 +253,7 @@ body {
     const minesInp = document.getElementById('mines');
 
     const DIFFS = {
+    infinite: {rows:12, cols:20, mines:25, infinite:true},
       beginner: {rows:9, cols:9, mines:10},
       intermediate: {rows:16, cols:16, mines:40},
       expert: {rows:16, cols:23, mines:99},
@@ -345,13 +346,85 @@ for (let i = 0; i < cells.length && placed < state.mines; i++) {
 
     function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=(Math.random()* (i+1))|0; [a[i],a[j]]=[a[j],a[i]]; } }
 
+function extendBoard() {
+  const oldCols = state.cols;
+  const newCols = oldCols + state.chunkSize;
+  state.cols = newCols;
+  document.documentElement.style.setProperty('--cols', newCols);
+
+  for (let r = 0; r < state.rows; r++) {
+    for (let c = oldCols; c < newCols; c++) {
+      const cell = {r, c, mine:false, count:0, flagged:false, revealed:false, el:null};
+      state.grid[r][c] = cell;
+      const el = document.createElement('button');
+      el.className = 'cell';
+      el.dataset.r = r;
+      el.dataset.c = c;
+      el.addEventListener('click', ()=> reveal(r,c));
+      el.addEventListener('contextmenu', (e)=>{ e.preventDefault(); toggleFlag(r,c); });
+      cell.el = el;
+      boardEl.appendChild(el);
+    }
+  }
+
+  // ставим мины с примерно той же плотностью
+  const newMines = Math.floor(state.rows * state.chunkSize * 0.12);
+  let placed = 0;
+  while (placed < newMines) {
+    const r = (Math.random() * state.rows) | 0;
+    const c = oldCols + ((Math.random() * state.chunkSize) | 0);
+    if (state.grid[r][c].mine) continue;
+    state.grid[r][c].mine = true;
+    placed++;
+  }
+
+  // пересчёт чисел
+  for (let r = 0; r < state.rows; r++) {
+    for (let c = oldCols - 1; c < newCols; c++) {
+      if (!state.grid[r][c]) continue;
+      const cell = state.grid[r][c];
+      if (cell.mine) { cell.count = -1; continue; }
+      let n = 0;
+      neighbors(r, c).forEach(([nr, nc])=>{
+        if (state.grid[nr]?.[nc]?.mine) n++;
+      });
+      cell.count = n;
+    }
+  }
+
+state.section++;
+const counter = document.getElementById('sectionsValue');
+if (counter) counter.textContent = state.section;
+}
+
     function init(rows, cols, mines){
-      stopTimer(); resetTimer(); setFace('idle'); statusEl.textContent=''; statusEl.className='status';
-      state = {rows, cols, mines, flags:0, revealed:0, alive:true, won:false, minesPlaced:false};
-      document.documentElement.style.setProperty('--cols', cols);
-      boardEl.innerHTML='';
-      state.grid = Array.from({length:rows}, (_,r)=>Array.from({length:cols}, (_,c)=>({
-        r,c, mine:false, count:0, flagged:false, revealed:false, el:null
+      
+  stopTimer(); resetTimer(); setFace('idle'); statusEl.textContent=''; statusEl.className='status';
+  state = {rows, cols, mines, flags:0, revealed:0, alive:true, won:false, minesPlaced:false};
+  state.generatedCols = cols;
+  state.chunkSize = 20;
+  state.minesPerChunk = Math.round(mines / (cols / state.chunkSize));
+  state.infinite = !!DIFFS[diffSel.value]?.infinite;
+const sectionCounter = document.getElementById('sectionCounter');
+if (state.infinite) {
+  sectionCounter.style.display = 'block';
+  document.getElementById('sectionsValue').textContent = state.section;
+} else {
+  sectionCounter.style.display = 'none';
+}
+  // добавляем счётчики для бесконечного режима
+  state.section = 0;
+  state.safeReveals = 0;             // сколько безопасных ячеек открыто подряд
+  state.revealThreshold = 120;        // нужно открыть столько клеток, чтобы получить новый chunk
+
+  document.getElementById('sectionsValue').textContent = state.section;
+
+  document.documentElement.style.setProperty('--cols', cols);
+  boardEl.innerHTML='';
+
+  state.grid = Array.from({length:rows}, (_,r)=>Array.from({length:cols}, (_,c)=>({
+    r,c, mine:false, count:0, flagged:false, revealed:false, el:null
+        
       })));
 
       //diamond shape
@@ -415,6 +488,7 @@ if (shape === "donut") {
     function updateMineCounter(){ mineCountEl.textContent = pad3(state.mines - state.flags); }
 
     function toggleFlag(r,c){
+      if (!state.alive) return;
       const cell = state.grid[r][c];
       if(cell.revealed) return;
       cell.flagged = !cell.flagged;
@@ -424,38 +498,77 @@ if (shape === "donut") {
       faceBtn.blur();
     }
 
-    function reveal(r,c){
-      const cell = state.grid[r][c];
-      if(cell.revealed || cell.flagged) { setFace('idle'); return; }
-      if(!state.minesPlaced){ placeMines(r,c); startTimer(); }
+   function reveal(r, c) {
+  if (!state.alive) return; // запрет действий после поражения
+  const cell = state.grid[r][c];
+  if (!cell || cell.revealed || cell.flagged) { setFace('idle'); return; }
 
-      cell.revealed = true; state.revealed++;
-      renderCell(cell);
+  if (!state.minesPlaced) { 
+    placeMines(r, c); 
+    startTimer(); 
+  }
 
-      if(cell.mine){
-        // Boom!
-        lose(r,c);
-        return;
+  cell.revealed = true; 
+  state.revealed++;
+  renderCell(cell);
+
+  // 💣 если мина — проигрыш, сброс счётчика
+  if (cell.mine) {
+    lose(r, c);
+    state.safeReveals = 0; // сброс при поражении
+    return;
+  }
+
+  // 🌿 безопасная клетка — увеличиваем счётчик
+  state.safeReveals++;
+
+  // 📈 проверяем, пора ли открыть новую секцию
+  if (state.infinite && state.safeReveals >= state.revealThreshold) {
+    extendBoard();
+    state.safeReveals = 0; // сброс счётчика после генерации новой секции
+  }
+
+  // раскрытие пустых клеток
+  if (cell.count === 0) { 
+    flood(r, c); 
+  }
+
+  setFace('idle');
+  checkWin();
+}
+
+
+   function flood(r, c) {
+  const q = [[r, c]];
+  const seen = new Set([index(r, c)]);
+  while (q.length) {
+    const [cr, cc] = q.shift();
+    neighbors(cr, cc).forEach(([nr, nc]) => {
+      const nb = state.grid[nr][nc];
+      const id = index(nr, nc);
+      if (seen.has(id) || nb.flagged || nb.revealed) return;
+      seen.add(id);
+
+      nb.revealed = true; 
+      state.revealed++;
+      renderCell(nb);
+
+      // 📊 учитываем как безопасное открытие
+      if (!nb.mine) state.safeReveals++;
+
+      if (nb.count === 0) { 
+        q.push([nr, nc]); 
       }
+    });
+  }
 
-      if(cell.count===0){ flood(r,c); }
-      setFace('idle');
-      checkWin();
-    }
+  // после массового раскрытия — проверка, нужно ли открыть новую секцию
+  if (state.infinite && state.safeReveals >= state.revealThreshold) {
+    extendBoard();
+    state.safeReveals = 0;
+  }
+}
 
-    function flood(r,c){
-      const q=[[r,c]]; const seen=new Set([index(r,c)]);
-      while(q.length){
-        const [cr,cc]=q.shift();
-        neighbors(cr,cc).forEach(([nr,nc])=>{
-          const nb = state.grid[nr][nc]; const id=index(nr,nc);
-          if(seen.has(id) || nb.flagged || nb.revealed) return;
-          seen.add(id);
-          nb.revealed = true; state.revealed++; renderCell(nb);
-          if(nb.count===0){ q.push([nr,nc]); }
-        });
-      }
-    }
 
     function chord(r,c){
       const cell = state.grid[r][c];
@@ -502,6 +615,7 @@ if(cell.mine){
     }
 
     function checkWin(){
+      if (state.infinite) return;
       const safe = state.rows*state.cols - state.mines;
       if(state.revealed >= safe){
         state.won = true; state.alive=false; stopTimer(); setFace('cool');
